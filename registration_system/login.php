@@ -11,39 +11,37 @@ $email = trim($_POST["email"] ?? "");
 $password = $_POST["password"] ?? "";
 
 if ($email === "" || $password === "") {
-    exit("Please enter your email and password.");
+    exit("Please enter email and password.");
 }
 
-// Find the user by email
+// Get user from database
 $stmt = $conn->prepare(
-    "SELECT id, fullname, email, password FROM users WHERE email = ?"
+    "SELECT id, fullname, email, password, role
+     FROM users
+     WHERE email = ?"
 );
 
-$stmt->bind_param("s", $email);
-$stmt->execute();
+$stmt->execute([$email]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$result = $stmt->get_result();
+// Verify login credentials
+if ($user && password_verify($password, $user["password"])) {
 
-if ($result->num_rows === 1) {
-    $user = $result->fetch_assoc();
+    session_regenerate_id(true);
 
-    // Verify the password
-    if (password_verify($password, $user["password"])) {
-        $_SESSION["user_id"] = $user["id"];
-        $_SESSION["fullname"] = $user["fullname"];
-        $_SESSION["email"] = $user["email"];
+    $_SESSION["user_id"] = $user["id"];
+    $_SESSION["fullname"] = $user["fullname"];
+    $_SESSION["email"] = $user["email"];
 
-        $stmt->close();
-        $conn->close();
-
-        header("Location: users.php");
-        exit;
+    // Redirect based on role
+    if ($user["role"] === "admin") {
+        header("Location: dachbord.php");
+    } else {
+        header("Location: index.php");
     }
-}
 
-// Same message for an unknown email or incorrect password
-$stmt->close();
-$conn->close();
+    exit;
+}
 
 echo "<script>
     alert('Invalid email or password');

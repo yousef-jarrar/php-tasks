@@ -1,4 +1,3 @@
-
 <?php
 require_once "connect.php";
 
@@ -15,18 +14,15 @@ if ($fullname === "" || $email === "" || $password === "") {
     exit("Please fill in all fields.");
 }
 
-// Check if the email already exists
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    exit("Invalid email address.");
+}
+
+// Check if email already exists
 $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+$stmt->execute([$email]);
 
-$stmt->bind_param("s", $email);
-$stmt->execute();
-
-$result = $stmt->get_result();
-
-if ($result->num_rows > 0) {
-    $stmt->close();
-    $conn->close();
-
+if ($stmt->fetch()) {
     echo "<script>
         alert('Email already has an account');
         window.location.href = 'index.php';
@@ -34,28 +30,24 @@ if ($result->num_rows > 0) {
     exit;
 }
 
-$stmt->close();
+// Hash password
+$hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-// Hash the password
-$hashed_password = password_hash($password, PASSWORD_BCRYPT);
-
-// Insert the new user
+// Insert new user
 $stmt = $conn->prepare(
     "INSERT INTO users (fullname, email, password)
      VALUES (?, ?, ?)"
 );
 
-$stmt->bind_param("sss", $fullname, $email, $hashed_password);
+try {
+    $stmt->execute([$fullname, $email, $hashed_password]);
 
-if ($stmt->execute()) {
     echo "<script>
         alert('Account created successfully');
         window.location.href = 'index.php';
     </script>";
-} else {
-    echo "Error creating account.";
+} catch (PDOException $e) {
+   error_log($e->getMessage());
+exit("Registration failed. Check the PHP error log.");
 }
-
-$stmt->close();
-$conn->close();
 ?>
